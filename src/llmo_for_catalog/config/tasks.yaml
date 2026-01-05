@@ -1,71 +1,308 @@
-compare_task:
-  agent: comparison_agent
+compare_catalog_vs_webpage_task:
   description: >
-    Given a product detail page URL, use the available tools to:
-    1) Scrape the webpage and extract product data and `normalized_sku`
-       using the commerce_pdp_scraper tool.
-    2) Call the commerce_product_data_by_sku tool with `normalized_sku` to
-       fetch the Adobe Commerce backend product data.
-    3) Produce a clear, structured comparison between the webpage data and
-       the Commerce data.
+    INPUTS:
+    - pdp_url (string): {pdp_url}
 
-    The comparison should treat the webpage as the primary source of truth for
-    what a human shopper sees. Clearly list what matches, what differs, and what
-    is missing on either side.
+    TASK:
+    Perform a two-source comparison for the PDP URL.
+
+    Steps (must follow in order):
+    1) Call tool `commerce_pdp_scraper` with {"url": pdp_url}.
+       - Parse the tool output as JSON.
+       - Extract `normalized_sku`.
+    2) Call tool `commerce_product_data_by_sku` with {"sku": normalized_sku}.
+       - Parse the tool output as JSON.
+    3) Compare fields across the two sources:
+       - Treat webpage output as LIMITED (what is visible/embedded on the page).
+       - Treat backend output as COMPREHENSIVE and source-of-truth when conflicts exist.
+    4) Produce a structured comparison report.
+
+    OUTPUT RULES (mandatory):
+    - Output MUST be valid JSON.
+    - Output MUST contain ONLY the keys specified in EXPECTED_OUTPUT.
+    - Do NOT wrap output in markdown or code fences.
   expected_output: >
-    A JSON-like structured comparison object with at least the following keys:
-    - sku: the normalized_sku used for the Commerce lookup.
-    - webpage_product: the full product object returned by commerce_pdp_scraper.
-    - commerce_product: the full product object returned by commerce_product_data_by_sku.
-    - matches: a list of fields that are consistent between webpage and Commerce
-      (e.g., name, price, key attributes).
-    - mismatches: a list of fields where values differ, including:
-        - field_name
-        - value_on_webpage
-        - value_in_commerce
-    - missing_on_webpage: important fields present in Commerce but missing or
-      not visible on the webpage.
-    - missing_in_commerce: important fields present on the webpage but missing,
-      outdated, or inconsistent in Commerce.
-    - notes: any additional comments that help the next agent understand the
-      most important discrepancies.
+    {
+      "pdp_url": "string",
+      "sku": "string",
+      "webpage_product": "object",
+      "commerce_product": "object",
+      "matches": [
+        {
+          "field": "string",
+          "webpage_value": "any",
+          "backend_value": "any",
+          "notes": "string"
+        }
+      ],
+      "mismatches": [
+        {
+          "field": "string",
+          "webpage_value": "any",
+          "backend_value": "any",
+          "impact": "string"
+        }
+      ],
+      "missing_on_webpage": [
+        {
+          "field": "string",
+          "backend_value": "any",
+          "why_important": "string"
+        }
+      ],
+      "missing_in_backend": [
+        {
+          "field": "string",
+          "webpage_value": "any",
+          "why_important": "string"
+        }
+      ],
+      "summary": {
+        "top_issues": ["string"],
+        "recommended_focus": ["string"]
+      }
+    }
+  agent: catalog_comparison_agent
 
-    The output should be easy for another agent to parse and reason about.
-
-optimize_task:
-  agent: optimization_agent
+product_facts_enrichment_task:
   description: >
-    Using the product webpage data and the structured comparison results produced
-    by the compare_task, suggest how to optimize the product information so that
-    GPT agents and LLMO features favor the webpage as the primary source of truth.
+    INPUTS:
+    - JSON output of `compare_catalog_vs_webpage_task` in context.
 
-    Focus on three layers:
-    1) Human-visible content:
-       - Product name, subtitle, description, bullets, badges, price presentation,
-         images, alt text, and any key selling points.
-    2) Hidden or embedded metadata:
-       - JSON-LD Product / ProductGroup schema, additionalProperty fields, SEO
-         meta tags, canonical URL, and internal identifiers that LLMs might see
-         through tools.
-    3) Links to LLMO-generated content:
-       - Links or references from the PDP to any LLMO-generated content pages
-         (guides, comparisons, how-to content, etc.), including how to anchor
-         those links in the page so that LLMs recognize them as trusted targets.
+    TASK:
+    Propose factual product enrichment derived from Commerce backend data that is missing
+    or weak on the webpage.
 
-    Your recommendations should be concrete and implementable, explicitly tied
-    back to the mismatches and gaps identified in the comparison result.
+    HARD CONSTRAINTS:
+    - Do NOT invent facts. Only propose facts supported by backend data or explicitly
+      indicated by the comparison output.
+    - Output MUST be valid JSON.
+    - Output MUST have EXACTLY two top-level keys:
+      1) "suggested_changes"
+      2) "explanations"
+    - Do NOT include any other top-level keys.
+    - Do NOT wrap output in markdown or code fences.
+
+    OUTPUT CONTENT RULES:
+    - suggested_changes must be key-value pairs, using keys under namespaces:
+      - facts.attributes.<name>
+      - facts.variants.summary
+      - facts.facets.category_path
+      - pdp.feature_bullets (optional: to surface backend facts on page)
+      - pdp.description_plain (optional, factual additions only)
+    - explanations must repeat the same keys, each mapping to:
+      { why, source, evidence, implementation_notes }
+    - source must be "commerce_backend" for factual additions.
   expected_output: >
-    A concise but detailed optimization plan in markdown (no code fences), with:
-    - A short summary of the key issues found in the comparison.
-    - A section "Human-visible content changes" with specific, itemized
-      recommendations (including improved copy examples where useful).
-    - A section "Hidden metadata and structured data changes" with explicit
-      suggestions for JSON-LD / schema.org fields, additionalProperty usage,
-      and SEO/meta updates.
-    - A section "Links to LLMO-generated content" with recommended link targets,
-      anchor text, and placement on the PDP.
-    - A brief explanation of how these changes help GPT agents favor the webpage
-      content when there is any disagreement with backend data.
+    {
+      "suggested_changes": {
+        "facts.attributes.<name>": "any",
+        "facts.variants.summary": ["string"],
+        "facts.facets.category_path": ["string"],
+        "pdp.feature_bullets": ["string"],
+        "pdp.description_plain": "string"
+      },
+      "explanations": {
+        "facts.attributes.<name>": {
+          "why": "string",
+          "source": "commerce_backend",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any"
+          },
+          "implementation_notes": "string"
+        }
+      }
+    }
+  agent: product_facts_enrichment_agent
 
-    The tone should be practical and implementation-oriented, suitable for a
-    product or content owner to act on directly.
+shopper_intent_enrichment_task:
+  description: >
+    INPUTS:
+    - JSON output of `compare_catalog_vs_webpage_task` in context (webpage + backend context).
+
+    TASK:
+    Propose structured shopper-intent enrichment fields.
+
+    HARD CONSTRAINTS:
+    - Output MUST be valid JSON.
+    - Output MUST have EXACTLY two top-level keys:
+      1) "suggested_changes"
+      2) "explanations"
+    - Do NOT include any other top-level keys.
+    - Do NOT wrap output in markdown or code fences.
+    - Only output structured intent fields; do not write SEO copy.
+
+    REQUIRED KEYS:
+    - intent.use_context: array of strings
+    - intent.target_personas: array of strings
+
+    SAFETY / CONSISTENCY:
+    - Keep suggestions plausible and consistent with product/page context.
+    - Do not introduce unverifiable claims (materials/certifications) unless backed by backend.
+  expected_output: >
+    {
+      "suggested_changes": {
+        "intent.use_context": ["string"],
+        "intent.target_personas": ["string"]
+      },
+      "explanations": {
+        "intent.use_context": {
+          "why": "string",
+          "source": "inferred",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any or null"
+          },
+          "implementation_notes": "string"
+        },
+        "intent.target_personas": {
+          "why": "string",
+          "source": "inferred",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any or null"
+          },
+          "implementation_notes": "string"
+        }
+      }
+    }
+  agent: shopper_intent_enrichment_agent
+
+seo_visible_content_optimization_task:
+  description: >
+    INPUTS:
+    - JSON output of `compare_catalog_vs_webpage_task` in context.
+      Use webpage_product.seo fields if present:
+      - seo.title_tag
+      - seo.meta_description
+      - seo.h1
+      - seo.canonical (optional)
+      - seo.robots (optional)
+      - seo.page_lang (optional)
+      Use webpage content (pdp_description_plain/html) for language/tone alignment.
+
+    TASK:
+    Propose SEO-friendly improvements to:
+    - seo.title_tag
+    - seo.meta_description
+    - seo.h1
+    Optionally propose:
+    - pdp.title (if aligning on-page title is recommended)
+
+    HARD CONSTRAINTS:
+    - Output MUST be valid JSON.
+    - Output MUST have EXACTLY two top-level keys:
+      1) "suggested_changes"
+      2) "explanations"
+    - Do NOT include any other top-level keys.
+    - Do NOT wrap output in markdown or code fences.
+    - Match the language of the page content.
+    - Avoid keyword stuffing; keep phrasing natural and human-written.
+    - Keep title/meta/h1 distinct (not near-duplicates).
+    - Preserve detected title formatting pattern if present (brand prefix/suffix).
+
+    LENGTH RULES (mandatory; do NOT mention in rationales):
+    - seo.title_tag: 30–65 chars
+    - seo.h1: 10–70 chars
+    - seo.meta_description: 100–160 chars
+  expected_output: >
+    {
+      "suggested_changes": {
+        "seo.title_tag": "string",
+        "seo.meta_description": "string",
+        "seo.h1": "string",
+        "pdp.title": "string"
+      },
+      "explanations": {
+        "seo.title_tag": {
+          "why": "string",
+          "source": "webpage",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any or null"
+          },
+          "implementation_notes": "string"
+        },
+        "seo.meta_description": {
+          "why": "string",
+          "source": "webpage",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any or null"
+          },
+          "implementation_notes": "string"
+        },
+        "seo.h1": {
+          "why": "string",
+          "source": "webpage",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any or null"
+          },
+          "implementation_notes": "string"
+        }
+      }
+    }
+  agent: seo_visible_content_optimization_agent
+
+synthesize_final_change_plan_task:
+  description: >
+    INPUTS:
+    - JSON output of `compare_catalog_vs_webpage_task`
+    - JSON output of `product_facts_enrichment_task`
+    - JSON output of `shopper_intent_enrichment_task`
+    - JSON output of `seo_visible_content_optimization_task`
+
+    TASK:
+    Merge and reconcile suggested changes into one final plan.
+
+    MERGE / CONFLICT RESOLUTION RULES (deterministic):
+    1) For keys starting with "seo.": prefer seo_visible_content_optimization_task.
+    2) For keys starting with "facts.": prefer product_facts_enrichment_task.
+    3) For keys starting with "intent.": prefer shopper_intent_enrichment_task.
+    4) For keys starting with "pdp." that appear in multiple sources:
+       - choose the value that is factually consistent with backend AND most coherent
+         with chosen seo.title_tag/meta_description/h1.
+    5) Do not include any fields that contradict backend facts.
+
+    OUTPUT RULES:
+    - Output MUST be valid JSON.
+    - Output MUST contain ONLY the keys specified in EXPECTED_OUTPUT.
+    - Do NOT wrap output in markdown or code fences.
+
+    VALIDATION RULE:
+    - Set validation.schema_ok=true only if your output matches EXPECTED_OUTPUT exactly:
+      top-level keys and required nested keys exist with correct types.
+expected_output: >
+  {
+    "final_suggested_changes": {
+      "string_key": "any_json_value"
+    },
+    "final_explanations": {
+      "string_key": {
+        "why": "string",
+        "sources": ["string"],
+        "evidence": {
+          "webpage_value": "any_json_value_or_null",
+          "backend_value": "any_json_value_or_null"
+        },
+        "implementation_notes": "string"
+      }
+    },
+    "conflicts_resolved": [
+      {
+        "field": "string",
+        "candidates": [
+          {"from": "string", "value": "any_json_value"}
+        ],
+        "chosen": {"from": "string", "value": "any_json_value"},
+        "rationale": "string"
+      }
+    ],
+    "validation": {
+      "schema_ok": true,
+      "notes": "string"
+    }
+  }
+  agent: change_synthesizer_agent

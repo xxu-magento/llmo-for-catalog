@@ -1,19 +1,13 @@
 #!/usr/bin/env python
 import sys
 import warnings
-
-from datetime import datetime
-
-from llmo_for_catalog.crew import LlmoForCatalog
 from pathlib import Path
 from datetime import datetime, timezone
 
+from llmo_for_catalog.crew import LlmoForCatalog
+
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-# This main file is intended to be a way for you to run your
-# crew locally, so refrain from adding unnecessary logic into this file.
-# Replace with inputs you want to test with, it will automatically
-# interpolate any tasks and agents information
 
 def run():
     """
@@ -22,19 +16,23 @@ def run():
     inputs = {
         "pdp_url": "https://www.adobestore.com/products/p-adb366/adb366"
     }
-    
+
     try:
         result = LlmoForCatalog().crew().kickoff(inputs=inputs)
-        fixture_path = "test.txt"
+
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        out_file = Path(fixture_path)
-        out_file.write_text(result.raw)
+        out_file = Path(f"test_result_{timestamp}.txt")
+
+        # Some CrewAI result objects have `.raw`, others stringify nicely
+        content = getattr(result, "raw", None)
+        if content is None:
+            content = str(result)
+
+        out_file.write_text(content, encoding="utf-8")
         print(f"Report saved to {out_file}")
+
     except Exception as e:
-        raise Exception(f"An error occurred while running the crew: {e}")
-    
-
-
+        raise Exception(f"An error occurred while running the crew run: {e}")
 
 
 def train():

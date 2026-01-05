@@ -1,54 +1,171 @@
-# LlmoForCatalog Crew
+# Catalog Intelligence Crew (crewAI)
 
-Welcome to the LlmoForCatalog Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+This project implements a **multi-agent catalog intelligence pipeline** using [crewAI](https://crewai.com).  
+It is designed to **analyze, compare, and enrich product detail pages (PDPs)** by combining:
+
+- **What is actually rendered on the webpage** (human-visible content and embedded metadata)
+- **What exists in the Adobe Commerce backend** (the complete, authoritative catalog truth per SKU)
+
+The system produces **actionable, structured recommendations** to improve:
+
+- **Product facts completeness** (attributes, variants, facets)
+- **Shopper intent clarity** (use context, target personas)
+- **SEO-critical human-visible content** (title tag, meta description, H1)
+
+All outputs are **machine-readable JSON**, suitable for **automation, validation, and downstream publishing workflows**.
+
+---
+
+## What This Project Does
+
+Given a **product detail page URL**, the crew performs the following steps:
+
+1. **Scrape the webpage** to extract:
+   - Visible content (title, description, images, price)
+   - Embedded metadata (JSON-LD, breadcrumbs, SKU)
+   - SEO signals (H1, `<title>`, meta description, canonical URL)
+
+2. **Fetch backend catalog data** from Adobe Commerce using the SKU:
+   - Full product attributes
+   - Options and variants
+   - Pricing and inventory
+   - Raw catalog payloads (fully preserved)
+
+3. **Compare webpage data with backend data** to identify:
+   - Missing or incomplete product facts
+   - Inconsistencies between sources
+   - Catalog information not surfaced on the PDP
+
+4. **Generate structured enrichment proposals** across three dimensions:
+   - **Product facts** (attributes, variants, facets)
+   - **Shopper intent** (use context, target personas)
+   - **SEO-visible content** (title tag, meta description, H1)
+
+5. **Synthesize a final, validated change plan** that can be:
+   - Reviewed by humans
+   - Applied programmatically
+   - Integrated with AEM or storefront publishing pipelines
+
+---
+
+## Architecture Overview
+
+### Agents (5-Agent Pipeline)
+
+| Agent | Responsibility |
+|------|----------------|
+| **catalog_comparison_agent** | Scrapes the PDP, fetches Commerce backend data, and produces a structured comparison |
+| **product_facts_enrichment_agent** | Suggests missing factual catalog information to add to the webpage |
+| **shopper_intent_enrichment_agent** | Adds shopper intent signals such as use context and target personas |
+| **seo_visible_content_optimization_agent** | Optimizes title, meta description, and H1 using SEO best practices |
+| **change_synthesizer_agent** | Merges outputs from agents 2–4 into a final, conflict-free change plan |
+
+All enrichment agents output **strict JSON** with the following structure:
+
+- `suggested_changes`: key-value pairs describing what should be added or updated  
+- `explanations`: per-field justification, source, and implementation notes  
+
+---
+
+## Key Tools
+
+### commerce_pdp_scraper
+
+Scrapes the product detail page itself (webpage source of truth):
+
+- HTML content
+- JSON-LD Product blocks
+- H1, title tag, meta description
+- Breadcrumbs
+- Images and price
+- Extracts and normalizes SKU (`normalized_sku`)
+
+This tool represents **what a human shopper and search engine can see**.
+
+### commerce_product_data_by_sku
+
+Fetches backend catalog truth via Adobe Commerce MCP:
+
+- Calls `productData` and `productVariants`
+- Retrieves attributes, options, variants, and pricing
+- Preserves **all raw backend fields**
+- Produces a normalized but complete structure for agents
+
+This tool represents **authoritative catalog truth per SKU**.
+
+---
 
 ## Installation
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+### Requirements
 
-First, if you haven't already, install uv:
+- **Python >= 3.10 and < 3.14**
+- An **OpenAI-compatible LLM API key** (used by crewAI)
+
+### Install Dependencies
+
+This project uses [UV](https://docs.astral.sh/uv/) for dependency management.
 
 ```bash
 pip install uv
-```
-
-Next, navigate to your project directory and install the dependencies:
-
-(Optional) Lock the dependencies and install them by using the CLI command:
-```bash
 crewai install
 ```
-### Customizing
 
-**Add your `OPENAI_API_KEY` into the `.env` file**
+### Environment Setup
 
-- Modify `src/llmo_for_catalog/config/agents.yaml` to define your agents
-- Modify `src/llmo_for_catalog/config/tasks.yaml` to define your tasks
-- Modify `src/llmo_for_catalog/crew.py` to add your own logic, tools and specific args
-- Modify `src/llmo_for_catalog/main.py` to add custom inputs for your agents and tasks
+Create a `.env` file in the project root:
 
-## Running the Project
+```env
+MODEL=your_selected_model
+AZURE_API_KEY=your_api_key
+AZURE_API_BASE=your_api_base
+AZURE_API_VERSION=your_api_version
 
-To kickstart your crew of AI agents and begin task execution, run this from the root folder of your project:
-
-```bash
-$ crewai run
+# ---------- Optional default logging level ----
+LOG_LEVEL=INFO
+CREWAI_TRACING_ENABLED=true
 ```
 
-This command initializes the llmo-for-catalog Crew, assembling the agents and assigning them tasks as defined in your configuration.
+---
 
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
+## Configuration
 
-## Understanding Your Crew
+You can customize the system by editing:
 
-The llmo-for-catalog Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
+- `src/llmo_for_catalog/config/agents.yaml`  
+  Defines agent roles, goals, constraints, and reasoning behavior.
 
-## Support
+- `src/llmo_for_catalog/config/tasks.yaml`  
+  Defines deterministic task inputs, outputs, and dependencies.
 
-For support, questions, or feedback regarding the LlmoForCatalog Crew or crewAI.
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
+- `src/llmo_for_catalog/crew.py`  
+  Wires agents, tools, and execution order.
 
-Let's create wonders together with the power and simplicity of crewAI.
+- `src/llmo_for_catalog/main.py`  
+  Controls runtime inputs and CLI behavior.
+
+---
+
+## Running the Crew
+
+### Run Locally with a PDP URL
+
+```bash
+crewai run
+```
+
+The final synthesized output will be written to:
+
+```
+catalog_change_plan.json
+```
+
+---
+
+## Output Guarantees
+
+- No narrative prose in enrichment agents  
+- Strict JSON schemas suitable for automation  
+- Backend data is treated as authoritative  
+- Webpage content is treated as search-visible truth  
+- All raw data is preserved for auditability and debugging  

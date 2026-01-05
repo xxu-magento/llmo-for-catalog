@@ -1,25 +1,18 @@
-import requests
-from bs4 import BeautifulSoup
 import json
 import re
 from typing import Any, Dict, List, Optional, Type
 
-from crewai.tools import BaseTool
+import requests
+from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 
+from crewai.tools import BaseTool
 
 # =========================
-# Helper functions (as you had)
+# Helper functions
 # =========================
 
 def _extract_additional_properties(product_ld: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract additionalProperty[*].name/value into a flat dict.
-
-    Supports:
-      - value as scalar (string/number)
-      - value as list (we keep the list)
-    """
     extra: Dict[str, Any] = {}
     ap = product_ld.get("additionalProperty", [])
 
@@ -37,16 +30,84 @@ def _extract_additional_properties(product_ld: Dict[str, Any]) -> Dict[str, Any]
     return extra
 
 
+def _get_meta_content(soup: BeautifulSoup, selector: str) -> Optional[str]:
+    """Helper to safely get meta/link attribute content."""
+    el = soup.select_one(selector)
+    if not el:
+        return None
+    # meta uses "content"; canonical uses "href"
+    if el.has_attr("content"):
+        val = el.get("content")
+        return val.strip() if isinstance(val, str) and val.strip() else None
+    if el.has_attr("href"):
+        val = el.get("href")
+        return val.strip() if isinstance(val, str) and val.strip() else None
+    return None
+
+
+def _extract_h1(soup: BeautifulSoup) -> Optional[str]:
+    h1 = soup.find("h1")
+    if not h1:
+        return None
+    text = h1.get_text(" ", strip=True)
+    return text if text else None
+
+
+def _detect_title_format(title_tag: Optional[str]) -> Dict[str, Any]:
+    """
+    Optional: detect if a site uses a title pattern like:
+    '{brand} - {page}' or '{page} | {brand}'.
+    """
+    if not title_tag:
+        return {"seo_title_format": None, "seo_title_format_notes": None}
+
+    # Heuristics
+    if " | " in title_tag:
+        return {
+            "seo_title_format": "pipe",
+            "seo_title_format_notes": "Title tag contains ' | ' separator (often '{page} | {brand}').",
+        }
+    if " - " in title_tag:
+        return {
+            "seo_title_format": "dash",
+            "seo_title_format_notes": "Title tag contains ' - ' separator (often '{brand} - {page}' or '{page} - {brand}').",
+        }
+    return {"seo_title_format": "none", "seo_title_format_notes": "No common separator detected."}
+
+
+def _extract_description_block(soup: BeautifulSoup) -> Dict[str, Any]:
+    """
+    Extract PDP description blocks as both HTML (if possible) and plain text.
+    This is useful for SEO agent improvements.
+    """
+    # Common PDP description containers across Adobe Commerce themes
+    desc_el = soup.select_one(
+        ".product.attribute.description, .product-info-main .value, .product-description"
+    )
+    if not desc_el:
+        return {
+            "pdp": {
+                "description_html": None,
+                "description_plain": None,
+            }
+        }
+
+    html = str(desc_el)
+    plain = desc_el.get_text(" ", strip=True)
+    return {
+        "pdp": {
+            "description_html": html if html else None,
+            "description_plain": plain if plain else None,
+        }
+    }
+
+
 def _fallback_extract_price(soup: BeautifulSoup) -> Dict[str, Optional[Any]]:
-    """
-    Try to extract price info from HTML when JSON-LD is missing or incomplete.
-    """
     price = None
     currency = None
     original_price = None
     original_currency = None
 
-    # 1) Adobe Commerce often uses data-price-type attributes
     price_span = soup.select_one('[data-price-type="finalPrice"] [data-price-amount]')
     if price_span and price_span.has_attr("data-price-amount"):
         try:
@@ -54,7 +115,6 @@ def _fallback_extract_price(soup: BeautifulSoup) -> Dict[str, Optional[Any]]:
         except ValueError:
             pass
 
-    # 2) Fallback: visible price text (very loose)
     if price is None:
         price_el = soup.select_one(".price, .special-price .price, .product-info-main .price")
         if price_el:
@@ -62,28 +122,19 @@ def _fallback_extract_price(soup: BeautifulSoup) -> Dict[str, Optional[Any]]:
             m = re.search(r"([$\u00a3\u20ac])\s*([\d.,]+)", text)
             if m:
                 symbol, num = m.groups()
-                currency = {
-                    "$": "USD",
-                    "€": "EUR",
-                    "£": "GBP"
-                }.get(symbol, None)
+                currency = {"$": "USD", "€": "EUR", "£": "GBP"}.get(symbol)
                 try:
                     price = float(num.replace(",", ""))
                 except ValueError:
                     pass
 
-    # 3) Original/list price (if shown)
     old_price_el = soup.select_one(".old-price .price, .price-box .old-price .price")
     if old_price_el:
         text = old_price_el.get_text(strip=True)
         m = re.search(r"([$\u00a3\u20ac])\s*([\d.,]+)", text)
         if m:
             symbol, num = m.groups()
-            original_currency = {
-                "$": "USD",
-                "€": "EUR",
-                "£": "GBP"
-            }.get(symbol, None)
+            original_currency = {"$": "USD", "€": "EUR", "£": "GBP"}.get(symbol)
             try:
                 original_price = float(num.replace(",", ""))
             except ValueError:
@@ -98,16 +149,12 @@ def _fallback_extract_price(soup: BeautifulSoup) -> Dict[str, Optional[Any]]:
 
 
 def _fallback_extract_images(soup: BeautifulSoup) -> List[str]:
-    """
-    Try to extract main image(s) from HTML when JSON-LD is missing.
-    """
     urls: List[str] = []
-
     for sel in [
         ".product.media img",
         ".gallery-placeholder img",
         ".fotorama__stage__frame img",
-        "img[src]"
+        "img[src]",
     ]:
         for img in soup.select(sel):
             src = img.get("data-src") or img.get("src")
@@ -116,36 +163,74 @@ def _fallback_extract_images(soup: BeautifulSoup) -> List[str]:
             if src not in urls:
                 urls.append(src)
         if urls:
-            break  # stop once we have some reasonably specific matches
-
+            break
     return urls
 
 
-def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
+def _make_soup(html: str) -> BeautifulSoup:
     """
-    Scrape an Adobe Store (or similar Adobe Commerce) PDP and return a normalized product dictionary.
+    Prefer lxml if installed; fall back to html.parser.
+    """
+    try:
+        return BeautifulSoup(html, "lxml")
+    except Exception:
+        return BeautifulSoup(html, "html.parser")
 
-    - Prefers JSON-LD (Product / ProductGroup) when available.
-    - Extracts additionalProperty into `additional_properties`.
-    - Falls back to HTML scraping if JSON-LD is missing or incomplete.
-    - Ensures there is a 'normalized_sku' field that the agent can pass into
-      the CommerceProductDataTool.
-    """
+
+def scrape_pdp(url: str) -> Dict[str, Any]:
     headers = {
         "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/123.0.0.0 Safari/537.36"
         )
     }
-    resp = requests.get(url, headers=headers, timeout=15)
-    resp.raise_for_status()
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    try:
+        resp = requests.get(url, headers=headers, timeout=20, allow_redirects=True)
+        # Make errors easier to diagnose
+        if resp.status_code >= 400:
+            raise requests.HTTPError(
+                f"HTTP {resp.status_code} fetching PDP URL: {url}",
+                response=resp,
+            )
+        resp.raise_for_status()
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch PDP URL: {url}. Error: {str(e)}") from e
+
+    soup = _make_soup(resp.text)
     result: Dict[str, Any] = {"url": url}
 
     # --------------------------------
-    # 1. Parse JSON-LD blocks
+    # SEO + page-level fields
+    # --------------------------------
+    seo_title_tag = soup.title.get_text(strip=True) if soup.title else None
+
+    seo_meta_description = _get_meta_content(soup, 'meta[name="description"]')
+    if not seo_meta_description:
+        seo_meta_description = _get_meta_content(soup, 'meta[property="og:description"]')
+
+    seo_canonical = _get_meta_content(soup, 'link[rel="canonical"]')
+    seo_robots = _get_meta_content(soup, 'meta[name="robots"]')
+
+    html_tag = soup.find("html")
+    page_lang = html_tag.get("lang") if html_tag and html_tag.get("lang") else None
+
+    seo_h1 = _extract_h1(soup)
+
+    result["seo"] = {
+        "title_tag": seo_title_tag,
+        "meta_description": seo_meta_description,
+        "h1": seo_h1,
+        "canonical": seo_canonical,
+        "robots": seo_robots,
+        "page_lang": page_lang,
+    }
+    result.update(_detect_title_format(seo_title_tag))
+    result.update(_extract_description_block(soup))
+
+    # --------------------------------
+    # 1) Parse JSON-LD blocks when available
     # --------------------------------
     jsonld_objects: List[Dict[str, Any]] = []
     for script in soup.find_all("script", type="application/ld+json"):
@@ -180,7 +265,7 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
         product_ld = jsonld_objects[0]
 
     # --------------------------------
-    # 2. Populate from JSON-LD when present
+    # 2) Populate from JSON-LD when available
     # --------------------------------
     if product_ld:
         ptype = product_ld.get("@type")
@@ -191,7 +276,6 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
         result["description"] = product_ld.get("description")
         result["canonical_url"] = product_ld.get("@id") or url
 
-        # images
         images = product_ld.get("image")
         if isinstance(images, str):
             images = [images]
@@ -199,7 +283,6 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
             images = []
         result["images"] = images
 
-        # offers
         price = None
         price_currency = None
         availability = None
@@ -228,7 +311,6 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
         result["original_price_currency"] = list_currency
         result["availability"] = availability
 
-        # variants (for ProductGroup)
         variants: List[Dict[str, Any]] = []
         if ptype == "ProductGroup":
             for v in product_ld.get("hasVariant", []):
@@ -261,14 +343,9 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
                     }
                 )
         result["variants"] = variants
-
-        # additionalProperty → additional_properties
         result["additional_properties"] = _extract_additional_properties(product_ld)
-
-        # keep raw JSON-LD
         result["raw_jsonld"] = product_ld
     else:
-        # No JSON-LD at all
         result["product_type"] = None
         result["sku"] = None
         result["title"] = None
@@ -285,10 +362,8 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
         result["raw_jsonld"] = None
 
     # --------------------------------
-    # 3. HTML-based extras
+    # 3) HTML-based extras
     # --------------------------------
-
-    # Breadcrumbs
     breadcrumbs: List[str] = []
     for crumb in soup.select("nav a, .breadcrumb a"):
         text = crumb.get_text(strip=True)
@@ -302,10 +377,9 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
             breadcrumbs_unique.append(c)
     result["breadcrumbs"] = breadcrumbs_unique
 
-    # Product code from text pattern, e.g. "Product Code: ADB366" or "SKU: ADB366"
     product_code = None
     for node in soup.find_all(string=re.compile(r"(SKU|Product Code)", re.IGNORECASE)):
-        m = re.search(r"(SKU|Product Code)\s*:\s*([A-Z0-9\-]+)", node)
+        m = re.search(r"(SKU|Product Code)\s*:\s*([A-Z0-9\-]+)", str(node))
         if m:
             product_code = m.group(2)
             break
@@ -313,32 +387,25 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
         product_code = result.get("sku")
     result["product_code"] = product_code
 
-    # Title fallback
+    # Title fallback from SEO H1 if JSON-LD title missing
     if not result.get("title"):
-        h1 = soup.find("h1")
-        if h1:
-            result["title"] = h1.get_text(strip=True)
+        if seo_h1:
+            result["title"] = seo_h1
 
-    # Description fallback
+    # Description fallback from extracted block (plain text)
     if not result.get("description"):
-        desc_el = soup.select_one(".product.attribute.description, .product-info-main .value, .product-description")
-        if desc_el:
-            result["description"] = desc_el.get_text(" ", strip=True)
+        if result.get("pdp", {}).get("description_plain"):
+            result["description"] = result["pdp"]["description_plain"]
 
-    # Images fallback
     if not result.get("images"):
         result["images"] = _fallback_extract_images(soup)
 
-    # Price fallback
     if result.get("price") is None:
         price_info = _fallback_extract_price(soup)
         for k, v in price_info.items():
             if result.get(k) is None and v is not None:
                 result[k] = v
 
-    # --------------------------------
-    # 4. Normalize SKU for agent usage
-    # --------------------------------
     normalized_sku = result.get("sku") or result.get("product_code")
     result["normalized_sku"] = normalized_sku
 
@@ -350,12 +417,6 @@ def scrape_adobestore_pdp(url: str) -> Dict[str, Any]:
 # =========================
 
 class ScrapePdpToolInput(BaseModel):
-    """
-    Input schema for the PDP scraper tool.
-
-    The agent must provide a single, full product detail page URL.
-    The URL should be a PDP that clearly corresponds to a single SKU.
-    """
     url: str = Field(
         ...,
         description=(
@@ -363,52 +424,27 @@ class ScrapePdpToolInput(BaseModel):
             "Example: 'https://www.adobestore.com/products/p-adb366/adb366'. "
             "The page must contain a SKU in JSON-LD or in visible text so it "
             "can be passed to the CommerceProductDataTool."
-        )
+        ),
     )
 
 
 class CommercePdpScraperTool(BaseTool):
-    """
-    Scrape a product detail page (PDP) and return the product information
-    that is visible and embedded on the webpage itself.
-
-    Use this tool when:
-    - You are given a website URL for a product page.
-    - You need to understand the product *as shown on the website*:
-      title, description, images, price, availability, additional properties,
-      breadcrumbs, and (very importantly) the product SKU.
-
-    Output:
-    - A JSON object that always includes:
-      - `normalized_sku`: the SKU extracted from the page. Use this value as
-        input to `commerce_product_data_by_sku` (CommerceProductDataTool).
-      - `title`, `description`, `price`, `price_currency`, `images`, etc.
-      - `additional_properties`: flattened additionalProperty from JSON-LD.
-      - `raw_jsonld`: original JSON-LD Product block when present.
-    - If no SKU can be found, the tool returns an error JSON explaining that
-      the page is not usable for SKU-based comparison.
-
-    This represents the "webpage source of truth" for what a human shopper sees.
-    """
-
     name: str = "commerce_pdp_scraper"
     description: str = (
         "Given a product detail page URL, scrape the webpage to extract product data "
         "(title, description, price, availability, images, additional properties, "
-        "breadcrumbs) and the product SKU. "
+        "breadcrumbs) and SEO fields (title tag, meta description, H1, canonical, robots, page language). "
         "Returns a JSON object that includes `normalized_sku`, which should be used "
-        "as the SKU input for the CommerceProductDataTool (`commerce_product_data_by_sku`) "
-        "to compare website content with Commerce backend data."
+        "as the SKU input for the CommerceProductDataTool (`commerce_product_data_by_sku`)."
     )
     args_schema: Type[BaseModel] = ScrapePdpToolInput
 
     def _run(self, url: str) -> str:
         try:
-            data = scrape_adobestore_pdp(url)
+            data = scrape_pdp(url)
 
             normalized_sku = data.get("normalized_sku")
             if not normalized_sku:
-                # Explicit, agent-readable error
                 return json.dumps(
                     {
                         "error": (
@@ -422,7 +458,6 @@ class CommercePdpScraperTool(BaseTool):
                     ensure_ascii=False,
                 )
 
-            # Normal success path
             return json.dumps(
                 {
                     "url": url,
@@ -439,8 +474,12 @@ class CommercePdpScraperTool(BaseTool):
                     "additional_properties": data.get("additional_properties"),
                     "product_type": data.get("product_type"),
                     "product_code": data.get("product_code"),
+                    "seo": data.get("seo"),
+                    "seo_title_format": data.get("seo_title_format"),
+                    "seo_title_format_notes": data.get("seo_title_format_notes"),
+                    "pdp": data.get("pdp"),
                     "raw_jsonld": data.get("raw_jsonld"),
-                    "raw": data,  # full scraped payload for deeper inspection
+                    "raw": data,
                 },
                 ensure_ascii=False,
             )
