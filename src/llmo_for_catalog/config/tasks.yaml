@@ -1,0 +1,71 @@
+compare_task:
+  agent: comparison_agent
+  description: >
+    Given a product detail page URL, use the available tools to:
+    1) Scrape the webpage and extract product data and `normalized_sku`
+       using the commerce_pdp_scraper tool.
+    2) Call the commerce_product_data_by_sku tool with `normalized_sku` to
+       fetch the Adobe Commerce backend product data.
+    3) Produce a clear, structured comparison between the webpage data and
+       the Commerce data.
+
+    The comparison should treat the webpage as the primary source of truth for
+    what a human shopper sees. Clearly list what matches, what differs, and what
+    is missing on either side.
+  expected_output: >
+    A JSON-like structured comparison object with at least the following keys:
+    - sku: the normalized_sku used for the Commerce lookup.
+    - webpage_product: the full product object returned by commerce_pdp_scraper.
+    - commerce_product: the full product object returned by commerce_product_data_by_sku.
+    - matches: a list of fields that are consistent between webpage and Commerce
+      (e.g., name, price, key attributes).
+    - mismatches: a list of fields where values differ, including:
+        - field_name
+        - value_on_webpage
+        - value_in_commerce
+    - missing_on_webpage: important fields present in Commerce but missing or
+      not visible on the webpage.
+    - missing_in_commerce: important fields present on the webpage but missing,
+      outdated, or inconsistent in Commerce.
+    - notes: any additional comments that help the next agent understand the
+      most important discrepancies.
+
+    The output should be easy for another agent to parse and reason about.
+
+optimize_task:
+  agent: optimization_agent
+  description: >
+    Using the product webpage data and the structured comparison results produced
+    by the compare_task, suggest how to optimize the product information so that
+    GPT agents and LLMO features favor the webpage as the primary source of truth.
+
+    Focus on three layers:
+    1) Human-visible content:
+       - Product name, subtitle, description, bullets, badges, price presentation,
+         images, alt text, and any key selling points.
+    2) Hidden or embedded metadata:
+       - JSON-LD Product / ProductGroup schema, additionalProperty fields, SEO
+         meta tags, canonical URL, and internal identifiers that LLMs might see
+         through tools.
+    3) Links to LLMO-generated content:
+       - Links or references from the PDP to any LLMO-generated content pages
+         (guides, comparisons, how-to content, etc.), including how to anchor
+         those links in the page so that LLMs recognize them as trusted targets.
+
+    Your recommendations should be concrete and implementable, explicitly tied
+    back to the mismatches and gaps identified in the comparison result.
+  expected_output: >
+    A concise but detailed optimization plan in markdown (no code fences), with:
+    - A short summary of the key issues found in the comparison.
+    - A section "Human-visible content changes" with specific, itemized
+      recommendations (including improved copy examples where useful).
+    - A section "Hidden metadata and structured data changes" with explicit
+      suggestions for JSON-LD / schema.org fields, additionalProperty usage,
+      and SEO/meta updates.
+    - A section "Links to LLMO-generated content" with recommended link targets,
+      anchor text, and placement on the PDP.
+    - A brief explanation of how these changes help GPT agents favor the webpage
+      content when there is any disagreement with backend data.
+
+    The tone should be practical and implementation-oriented, suitable for a
+    product or content owner to act on directly.
