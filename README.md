@@ -1,10 +1,11 @@
-# Catalog Intelligence Crew (crewAI)
+# LLMO for Catalog POC
 
-This project implements a **multi-agent catalog intelligence pipeline** using [crewAI](https://crewai.com).  
+This project is a POC to illustrate the flow for LLMO for catalog. It implements a **multi-agent catalog intelligence pipeline** using [crewAI](https://crewai.com).  
 It is designed to **analyze, compare, and enrich product detail pages (PDPs)** by combining:
 
 - **What is actually rendered on the webpage** (human-visible content and embedded metadata)
 - **What exists in the Adobe Commerce backend** (the complete, authoritative catalog truth per SKU)
+- **AI intelligence for further user-intent enrichment and SEO optimization**
 
 The system produces **actionable, structured recommendations** to improve:
 
