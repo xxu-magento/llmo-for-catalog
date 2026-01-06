@@ -4,29 +4,70 @@ compare_catalog_vs_webpage_task:
     - pdp_url (string): {pdp_url}
 
     TASK:
-    Perform a two-source comparison for the PDP URL.
+    Perform a two-source comparison for the PDP URL and produce a JSON payload that
+    downstream agents can use WITHOUT re-calling tools.
 
     Steps (must follow in order):
     1) Call tool `commerce_pdp_scraper` with {"url": pdp_url}.
-       - Parse the tool output as JSON.
-       - Extract `normalized_sku`.
+       - Parse the tool output as JSON into `webpage_product`.
+       - Extract `normalized_sku` as the SKU for backend lookup.
+       - If the tool output contains "error", stop and return a JSON object
+         matching EXPECTED_OUTPUT, setting:
+           - sku = null
+           - webpage_product = parsed error object
+           - commerce_product = null
+           - raw_sources.webpage = parsed tool output
+           - raw_sources.backend = null
+           - matches/mismatches/missing_* = empty arrays
+           - summary.top_issues must include the error string
+
     2) Call tool `commerce_product_data_by_sku` with {"sku": normalized_sku}.
-       - Parse the tool output as JSON.
+       - Parse the tool output as JSON into `commerce_product`.
+       - If the tool output contains "error", stop and return a JSON object
+         matching EXPECTED_OUTPUT, setting:
+           - sku = normalized_sku
+           - commerce_product = parsed error object
+           - raw_sources.backend = parsed tool output
+           - matches/mismatches/missing_* = empty arrays
+           - summary.top_issues must include the error string
+
     3) Compare fields across the two sources:
-       - Treat webpage output as LIMITED (what is visible/embedded on the page).
-       - Treat backend output as COMPREHENSIVE and source-of-truth when conflicts exist.
+       - Treat `webpage_product` as LIMITED (what is visible/embedded on the page).
+       - Treat `commerce_product` as COMPREHENSIVE and source-of-truth when conflicts exist.
+       - Identify:
+         a) matches: same meaning/value (or clearly consistent)
+         b) mismatches: conflicting values where backend is authoritative
+         c) missing_on_webpage: backend fields not surfaced on webpage
+         d) missing_in_backend: webpage fields absent in backend (rare; flag for investigation)
+
+       Comparison scope (minimum required fields):
+       - sku / normalized_sku
+       - title/name
+       - description (page plain or JSON-LD) vs backend description_html/shortDescription
+       - price / currency if available
+       - images (presence + count, not necessarily exact ordering)
+       - key attributes and options presence (e.g., size/color)
+       - variants presence (if backend provides variants/tool output includes them)
+
     4) Produce a structured comparison report.
 
     OUTPUT RULES (mandatory):
     - Output MUST be valid JSON.
     - Output MUST contain ONLY the keys specified in EXPECTED_OUTPUT.
     - Do NOT wrap output in markdown or code fences.
+    - raw_sources MUST include the original parsed tool outputs so downstream agents
+      can infer shopper intent and SEO improvements without tool re-calls.
+
   expected_output: >
     {
       "pdp_url": "string",
-      "sku": "string",
-      "webpage_product": "object",
-      "commerce_product": "object",
+      "sku": "string or null",
+      "webpage_product": "object or null",
+      "commerce_product": "object or null",
+      "raw_sources": {
+        "webpage": "object or null",
+        "backend": "object or null"
+      },
       "matches": [
         {
           "field": "string",
@@ -64,18 +105,42 @@ compare_catalog_vs_webpage_task:
     }
   agent: catalog_comparison_agent
 
-product_facts_enrichment_task:
+product_page_enrichment_task:
   description: >
     INPUTS:
-    - JSON output of `compare_catalog_vs_webpage_task` in context.
+    - compare_result (JSON): The JSON output of `compare_catalog_vs_webpage_task` must be present
+      in this task's context.
+
+    REQUIRED INPUT CONTENT (must exist inside compare_result):
+    1) compare_result.raw_sources.webpage:
+       - The parsed JSON output returned by tool `commerce_pdp_scraper`.
+       - Must include the full scraped payload needed for intent inference and factual surfacing.
+       - Expected to contain (when available): title, description, images, breadcrumbs, additional_properties,
+         plus `raw` and any SEO-relevant fields if the scraper provides them.
+
+    2) compare_result.raw_sources.backend:
+       - The parsed JSON output returned by tool `commerce_product_data_by_sku`.
+       - Must include full product payload for the SKU, including:
+         - products[*].raw (full backend record)
+         - variants information if present (e.g., from productVariants call, if your backend tool adds it)
+       - This is the authoritative source for factual product data.
+
+    3) compare_result.missing_on_webpage and compare_result.mismatches:
+       - Use these lists as primary guidance for what to enrich/surface.
+       - You may also consult compare_result.matches and compare_result.summary for prioritization.
 
     TASK:
-    Propose factual product enrichment derived from Commerce backend data that is missing
-    or weak on the webpage.
+    Produce ONE consolidated enrichment proposal to apply to the PDP webpage ONLY,
+    combining:
+      (1) factual product facts to surface on the webpage, derived from backend data
+      (2) structured shopper-intent enrichment fields inferred from webpage + backend context
 
-    HARD CONSTRAINTS:
-    - Do NOT invent facts. Only propose facts supported by backend data or explicitly
-      indicated by the comparison output.
+    HARD CONSTRAINTS (deterministic):
+    - Webpage-only changes. Do NOT propose any backend catalog edits.
+    - Do NOT invent facts. Any "facts.*" or factual "pdp.*" additions must be supported by backend_value
+      in raw_sources.backend OR explicitly indicated by compare output.
+    - "intent.*" may be inferred but must remain plausible, consistent with product/page context,
+      and must not claim certifications/materials unless backed by backend.
     - Output MUST be valid JSON.
     - Output MUST have EXACTLY two top-level keys:
       1) "suggested_changes"
@@ -84,15 +149,33 @@ product_facts_enrichment_task:
     - Do NOT wrap output in markdown or code fences.
 
     OUTPUT CONTENT RULES:
-    - suggested_changes must be key-value pairs, using keys under namespaces:
-      - facts.attributes.<name>
-      - facts.variants.summary
-      - facts.facets.category_path
-      - pdp.feature_bullets (optional: to surface backend facts on page)
-      - pdp.description_plain (optional, factual additions only)
-    - explanations must repeat the same keys, each mapping to:
-      { why, source, evidence, implementation_notes }
-    - source must be "commerce_backend" for factual additions.
+    - suggested_changes must include only webpage-applied fields in these namespaces:
+
+      FACTS / PDP FACT SURFACING (backend-supported only):
+        - facts.attributes.<name>                 (any JSON value)
+        - facts.variants.summary                  (array of strings; high-level variant characteristics)
+        - facts.facets.category_path              (array of strings)
+        - pdp.feature_bullets                     (array of strings; factual bullets only)
+        - pdp.description_plain                   (string; factual additions only)
+
+      SHOPPER INTENT (inferred but plausible):
+        - intent.use_context                      (array of strings)
+        - intent.target_personas                  (array of strings)
+
+    - explanations must contain the SAME keys as suggested_changes.
+      Each key maps to an object with:
+        { why, source, evidence, implementation_notes }
+
+    SOURCE RULES:
+    - For facts.* and factual pdp.*: source MUST be "commerce_backend"
+    - For intent.*: source MUST be "inferred"
+
+    EVIDENCE RULES:
+    - evidence.webpage_value: read from raw_sources.webpage (or null)
+    - evidence.backend_value:
+        - for commerce_backend facts: read from raw_sources.backend (required, not null)
+        - for inferred intent: may be null or a supporting snippet
+
   expected_output: >
     {
       "suggested_changes": {
@@ -100,7 +183,9 @@ product_facts_enrichment_task:
         "facts.variants.summary": ["string"],
         "facts.facets.category_path": ["string"],
         "pdp.feature_bullets": ["string"],
-        "pdp.description_plain": "string"
+        "pdp.description_plain": "string",
+        "intent.use_context": ["string"],
+        "intent.target_personas": ["string"]
       },
       "explanations": {
         "facts.attributes.<name>": {
@@ -111,42 +196,43 @@ product_facts_enrichment_task:
             "backend_value": "any"
           },
           "implementation_notes": "string"
-        }
-      }
-    }
-  agent: product_facts_enrichment_agent
-
-shopper_intent_enrichment_task:
-  description: >
-    INPUTS:
-    - JSON output of `compare_catalog_vs_webpage_task` in context (webpage + backend context).
-
-    TASK:
-    Propose structured shopper-intent enrichment fields.
-
-    HARD CONSTRAINTS:
-    - Output MUST be valid JSON.
-    - Output MUST have EXACTLY two top-level keys:
-      1) "suggested_changes"
-      2) "explanations"
-    - Do NOT include any other top-level keys.
-    - Do NOT wrap output in markdown or code fences.
-    - Only output structured intent fields; do not write SEO copy.
-
-    REQUIRED KEYS:
-    - intent.use_context: array of strings
-    - intent.target_personas: array of strings
-
-    SAFETY / CONSISTENCY:
-    - Keep suggestions plausible and consistent with product/page context.
-    - Do not introduce unverifiable claims (materials/certifications) unless backed by backend.
-  expected_output: >
-    {
-      "suggested_changes": {
-        "intent.use_context": ["string"],
-        "intent.target_personas": ["string"]
-      },
-      "explanations": {
+        },
+        "facts.variants.summary": {
+          "why": "string",
+          "source": "commerce_backend",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any"
+          },
+          "implementation_notes": "string"
+        },
+        "facts.facets.category_path": {
+          "why": "string",
+          "source": "commerce_backend",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any"
+          },
+          "implementation_notes": "string"
+        },
+        "pdp.feature_bullets": {
+          "why": "string",
+          "source": "commerce_backend",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any"
+          },
+          "implementation_notes": "string"
+        },
+        "pdp.description_plain": {
+          "why": "string",
+          "source": "commerce_backend",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any"
+          },
+          "implementation_notes": "string"
+        },
         "intent.use_context": {
           "why": "string",
           "source": "inferred",
@@ -167,30 +253,35 @@ shopper_intent_enrichment_task:
         }
       }
     }
-  agent: shopper_intent_enrichment_agent
+  agent: product_page_enrichment_agent
 
-seo_visible_content_optimization_task:
+product_catalog_enrichment_task:
   description: >
     INPUTS:
     - JSON output of `compare_catalog_vs_webpage_task` in context.
-      Use webpage_product.seo fields if present:
-      - seo.title_tag
-      - seo.meta_description
-      - seo.h1
-      - seo.canonical (optional)
-      - seo.robots (optional)
-      - seo.page_lang (optional)
-      Use webpage content (pdp_description_plain/html) for language/tone alignment.
+
+    REQUIRED INPUT CONTENT (must exist inside compare output):
+    - raw_sources.webpage: parsed output of `commerce_pdp_scraper`
+      (use for current as-rendered tags/content and language/tone detection).
+    - raw_sources.backend: parsed output of `commerce_product_data_by_sku`
+      (use as authoritative product facts and current catalog content).
+    - mismatches / missing_on_webpage: use as prioritization hints.
 
     TASK:
-    Propose SEO-friendly improvements to:
-    - seo.title_tag
-    - seo.meta_description
-    - seo.h1
+    Propose catalog backend updates to SEO-relevant and human-visible content fields.
+    The goal is to improve SEO performance and shopper clarity while staying truthful
+    to backend product facts and matching page language.
+
+    Propose improvements to these catalog fields:
+    - catalog.seo.title_tag
+    - catalog.seo.meta_description
+    - catalog.seo.h1
+
     Optionally propose:
-    - pdp.title (if aligning on-page title is recommended)
+    - catalog.pdp.title (only if backend product title should be aligned to improve clarity/SEO)
 
     HARD CONSTRAINTS:
+    - Changes MUST be applicable to the Commerce catalog backend (not HTML edits).
     - Output MUST be valid JSON.
     - Output MUST have EXACTLY two top-level keys:
       1) "suggested_changes"
@@ -201,41 +292,56 @@ seo_visible_content_optimization_task:
     - Avoid keyword stuffing; keep phrasing natural and human-written.
     - Keep title/meta/h1 distinct (not near-duplicates).
     - Preserve detected title formatting pattern if present (brand prefix/suffix).
+    - Do NOT introduce factual claims not supported by backend data.
 
     LENGTH RULES (mandatory; do NOT mention in rationales):
-    - seo.title_tag: 30–65 chars
-    - seo.h1: 10–70 chars
-    - seo.meta_description: 100–160 chars
+    - catalog.seo.title_tag: 30–65 chars
+    - catalog.seo.h1: 10–70 chars
+    - catalog.seo.meta_description: 100–160 chars
+
+    EVIDENCE USAGE:
+    - Compare current webpage tags (raw_sources.webpage.seo.* if present) vs current backend content.
+    - Use backend product facts (attributes/options/description) to ensure truthfulness.
+
   expected_output: >
     {
       "suggested_changes": {
-        "seo.title_tag": "string",
-        "seo.meta_description": "string",
-        "seo.h1": "string",
-        "pdp.title": "string"
+        "catalog.seo.title_tag": "string",
+        "catalog.seo.meta_description": "string",
+        "catalog.seo.h1": "string",
+        "catalog.pdp.title": "string"
       },
       "explanations": {
-        "seo.title_tag": {
+        "catalog.seo.title_tag": {
           "why": "string",
-          "source": "webpage",
+          "source": "commerce_backend",
           "evidence": {
             "webpage_value": "any or null",
             "backend_value": "any or null"
           },
           "implementation_notes": "string"
         },
-        "seo.meta_description": {
+        "catalog.seo.meta_description": {
           "why": "string",
-          "source": "webpage",
+          "source": "commerce_backend",
           "evidence": {
             "webpage_value": "any or null",
             "backend_value": "any or null"
           },
           "implementation_notes": "string"
         },
-        "seo.h1": {
+        "catalog.seo.h1": {
           "why": "string",
-          "source": "webpage",
+          "source": "commerce_backend",
+          "evidence": {
+            "webpage_value": "any or null",
+            "backend_value": "any or null"
+          },
+          "implementation_notes": "string"
+        },
+        "catalog.pdp.title": {
+          "why": "string",
+          "source": "commerce_backend",
           "evidence": {
             "webpage_value": "any or null",
             "backend_value": "any or null"
@@ -244,7 +350,8 @@ seo_visible_content_optimization_task:
         }
       }
     }
-  agent: seo_visible_content_optimization_agent
+  agent: product_catalog_enrichment_agent
+
 
 synthesize_final_change_plan_task:
   description: >
@@ -253,10 +360,8 @@ synthesize_final_change_plan_task:
     - JSON output of `product_facts_enrichment_task`
     - JSON output of `shopper_intent_enrichment_task`
     - JSON output of `seo_visible_content_optimization_task`
-
     TASK:
     Merge and reconcile suggested changes into one final plan.
-
     MERGE / CONFLICT RESOLUTION RULES (deterministic):
     1) For keys starting with "seo.": prefer seo_visible_content_optimization_task.
     2) For keys starting with "facts.": prefer product_facts_enrichment_task.
@@ -265,44 +370,42 @@ synthesize_final_change_plan_task:
        - choose the value that is factually consistent with backend AND most coherent
          with chosen seo.title_tag/meta_description/h1.
     5) Do not include any fields that contradict backend facts.
-
     OUTPUT RULES:
     - Output MUST be valid JSON.
     - Output MUST contain ONLY the keys specified in EXPECTED_OUTPUT.
     - Do NOT wrap output in markdown or code fences.
-
     VALIDATION RULE:
     - Set validation.schema_ok=true only if your output matches EXPECTED_OUTPUT exactly:
       top-level keys and required nested keys exist with correct types.
-expected_output: >
-  {
-    "final_suggested_changes": {
-      "string_key": "any_json_value"
-    },
-    "final_explanations": {
-      "string_key": {
-        "why": "string",
-        "sources": ["string"],
-        "evidence": {
-          "webpage_value": "any_json_value_or_null",
-          "backend_value": "any_json_value_or_null"
-        },
-        "implementation_notes": "string"
+  expected_output: >
+    {
+      "final_suggested_changes": {
+        "string_key": "any_json_value"
+      },
+      "final_explanations": {
+        "string_key": {
+          "why": "string",
+          "sources": ["string"],
+          "evidence": {
+            "webpage_value": "any_json_value_or_null",
+            "backend_value": "any_json_value_or_null"
+          },
+          "implementation_notes": "string"
+        }
+      },
+      "conflicts_resolved": [
+        {
+          "field": "string",
+          "candidates": [
+            {"from": "string", "value": "any_json_value"}
+          ],
+          "chosen": {"from": "string", "value": "any_json_value"},
+          "rationale": "string"
+        }
+      ],
+      "validation": {
+        "schema_ok": true,
+        "notes": "string"
       }
-    },
-    "conflicts_resolved": [
-      {
-        "field": "string",
-        "candidates": [
-          {"from": "string", "value": "any_json_value"}
-        ],
-        "chosen": {"from": "string", "value": "any_json_value"},
-        "rationale": "string"
-      }
-    ],
-    "validation": {
-      "schema_ok": true,
-      "notes": "string"
     }
-  }
   agent: change_synthesizer_agent

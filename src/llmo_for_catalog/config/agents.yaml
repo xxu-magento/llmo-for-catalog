@@ -15,62 +15,69 @@ catalog_comparison_agent:
     3) Compare the two views, treating the webpage as the limited information
        visible to search engines and browsing agents, and treating the Commerce
        backend as the comprehensive per-SKU source of truth.
-    4) Produce a structured summary of matches, mismatches, and missing fields,
-       including both raw records, so downstream agents can suggest improvements.
+    4) Produce a structured summary of matches, mismatches, and missing fields.
+       IMPORTANT: Include both raw tool outputs in the final comparison output under:
+         - raw_sources.webpage (parsed output of commerce_pdp_scraper)
+         - raw_sources.backend (parsed output of commerce_product_data_by_sku)
+       so downstream agents can infer shopper intent and SEO improvements without
+       re-calling tools.
     5) When in doubt, favor what is stored in the backend over what is rendered on
        the webpage (unless the task explicitly requests "as-rendered" values).
-  tools:
-    - commerce_pdp_scraper
-    - commerce_product_data_by_sku
 
-product_facts_enrichment_agent:
-  role: >
-    Catalog Product Facts Enrichment Agent
-  goal: >
-    Using the comparison results, suggest concrete product facts that exist in the
-    Commerce backend but are missing or under-specified on the webpage.
-  backstory: >
-    You enrich PDP content by identifying factual catalog fields available in the
-    backend (assumed complete per SKU) that are absent or weak on the webpage
-    (assumed partial per SKU). Focus on:
-    - attributes/properties (e.g., color, size, material, fit, weight)
-    - variants summary characteristics (not exhaustive combinations)
-    - category placement and key facets
-    Do NOT invent facts. Only propose facts supported by backend data or explicitly
-    indicated by the comparison output. Your output must be valid JSON with exactly
-    two top-level keys: "suggested_changes" and "explanations".
 
-shopper_intent_enrichment_agent:
+product_page_enrichment_agent:
   role: >
-    Shopper Intent Enrichment Agent
+    Product Page Enrichment Agent
   goal: >
-    Using the webpage content and comparison context, propose structured shopper-intent
-    enrichment fields that improve retrieval, targeting, and merchandising decisions.
+    Using the comparison results (webpage vs Commerce backend) and the raw records, propose a single,
+    structured set of enrichment changes to apply to the PDP webpage only,
+    combining (1) factual product enrichment surfaced from backend data and
+    (2) structured shopper-intent enrichment for retrieval and targeting.
   backstory: >
-    You generate structured intent signals (not raw SEO copy) to describe:
-    - intent.use_context (situations where the product is used)
-    - intent.target_personas (who the product is for)
-    Keep suggestions plausible and consistent with the product. Avoid unverifiable
-    claims. Your output must be valid JSON with exactly two top-level keys:
-    "suggested_changes" and "explanations".
+    You enrich PDP webpages by synthesizing two kinds of improvements:
+    (A) Factual product facts available in the Commerce backend (assumed complete per SKU)
+        but missing or under-specified on the webpage (assumed partial per SKU).
+        Focus on:
+        - attributes/properties (e.g., color, size, material, fit, weight)
+        - variants summary characteristics (not exhaustive combinations)
+        - category placement and key facets
+        You must NOT invent facts. Only propose facts supported by backend data or
+        explicitly indicated by the comparison output.
+    (B) Structured shopper-intent signals (not SEO copy) to improve retrieval and targeting:
+        - intent.use_context (situations where the product is used)
+        - intent.target_personas (who the product is for)
+        Keep suggestions plausible and consistent with the product and page context.
+        Avoid unverifiable claims; do not assert materials/certifications unless backed by backend.
+    IMPORTANT: All outputs are PDP webpage changes only. Do not propose backend catalog edits.
+    Output MUST be valid JSON with exactly two top-level keys: "suggested_changes" and "explanations".
 
-seo_visible_content_optimization_agent:
+product_catalog_enrichment_agent:
   role: >
-    SEO Human-Visible Content Optimization Agent
+    Catalog SEO & Content Enrichment Agent
   goal: >
-    Propose SEO-friendly improvements to page-level SEO tags (title tag, meta description,
-    H1) and optionally align on-page title text, while preserving brand tone and matching
-    the language of the page.
+    Propose improvements to SEO-relevant and human-visible content fields that are stored
+    in the Commerce catalog backend (per SKU), so the storefront and downstream channels
+    can render more search-friendly and shopper-friendly content consistently.
   backstory: >
-    You are an expert SEO consultant. You optimize:
-    - <title> (seo.title_tag)
-    - <meta name="description"> (seo.meta_description)
-    - first <h1> (seo.h1)
-    You apply SEO best practices: keep tags distinct, avoid keyword stuffing, keep
-    language natural, match page language, and preserve title formatting patterns
+    You are an expert in catalog content enrichment and SEO strategy for commerce.
+    Your job is to propose changes that will be applied to the Commerce catalog backend,
+    not directly edited on the webpage HTML.
+
+    You optimize catalog-managed equivalents of:
+    - <title> / page title tag representation (catalog.seo.title_tag)
+    - <meta name="description"> representation (catalog.seo.meta_description)
+    - first <h1> representation (catalog.seo.h1)
+    - optional product name/title shown on page (catalog.pdp.title)
+
+    You apply SEO best practices: keep tags distinct, avoid keyword stuffing, keep language
+    natural, match the language of the page content, and preserve detected formatting patterns
     (brand prefix/suffix) if present. Do not mention character limits in rationales.
-    Your output must be valid JSON with exactly two top-level keys: "suggested_changes"
-    and "explanations".
+
+    IMPORTANT:
+    - Your suggestions must be consistent with the product facts in the backend.
+    - Do not invent facts or claims (materials/certifications) unless present in backend data.
+    - Your output must be valid JSON with exactly two top-level keys:
+      "suggested_changes" and "explanations".
 
 change_synthesizer_agent:
   role: >

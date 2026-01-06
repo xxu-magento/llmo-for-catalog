@@ -51,20 +51,19 @@ Given a **product detail page URL**, the crew performs the following steps:
 
 ## Architecture Overview
 
-### Agents (5-Agent Pipeline)
+### Agents (4-Agent Pipeline)
 
 | Agent | Responsibility |
 |------|----------------|
-| **catalog_comparison_agent** | Scrapes the PDP, fetches Commerce backend data, and produces a structured comparison |
-| **product_facts_enrichment_agent** | Suggests missing factual catalog information to add to the webpage |
-| **shopper_intent_enrichment_agent** | Adds shopper intent signals such as use context and target personas |
-| **seo_visible_content_optimization_agent** | Optimizes title, meta description, and H1 using SEO best practices |
-| **change_synthesizer_agent** | Merges outputs from agents 2–4 into a final, conflict-free change plan |
+| **catalog_comparison_agent** | Scrapes the PDP, fetches Commerce backend data, and produces a structured comparison (including raw sources) |
+| **product_page_enrichment_agent** | Produces ONE consolidated PDP webpage enrichment proposal (facts surfacing + shopper intent fields), webpage-only changes |
+| **product_catalog_enrichment_agent** | Proposes Commerce catalog backend enrichment (catalog-managed SEO/content fields) |
+| **change_synthesizer_agent** | Merges outputs from enrichment agents into a final, conflict-resolved change plan |
 
 All enrichment agents output **strict JSON** with the following structure:
 
 - `suggested_changes`: key-value pairs describing what should be added or updated  
-- `explanations`: per-field justification, source, and implementation notes  
+- `explanations`: per-field justification, source, evidence, and implementation notes  
 
 ---
 
@@ -158,7 +157,7 @@ crewai run
 The final synthesized output will be written to:
 
 ```
-catalog_change_plan.json
+suggestions_and_explanations.json
 ```
 
 ---

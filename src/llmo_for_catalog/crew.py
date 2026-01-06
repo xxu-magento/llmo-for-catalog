@@ -10,7 +10,7 @@ from .tools.commerce_product_data_tool import CommerceProductDataTool
 
 @CrewBase
 class LlmoForCatalog:
-    """LlmoForCatalog crew (5-agent pipeline)."""
+    """LlmoForCatalog crew (updated pipeline)."""
 
     agents: List[BaseAgent]
     tasks: List[Task]
@@ -26,7 +26,7 @@ class LlmoForCatalog:
         - Takes PDP URL
         - Scrapes webpage via commerce_pdp_scraper
         - Fetches backend data via commerce_product_data_by_sku
-        - Produces structured comparison JSON
+        - Produces structured comparison JSON (including raw_sources.webpage/backend)
         """
         return Agent(
             config=self.agents_config["catalog_comparison_agent"],  # type: ignore[index]
@@ -38,49 +38,37 @@ class LlmoForCatalog:
         )
 
     @agent
-    def product_facts_enrichment_agent(self) -> Agent:
+    def product_page_enrichment_agent(self) -> Agent:
         """
         Agent #2:
-        - Uses comparison output
-        - Suggests factual enrichments from backend that are missing/weak on webpage
+        - Uses comparison output (including raw_sources.webpage/backend)
+        - Produces ONE consolidated PDP webpage-only enrichment proposal:
+          (facts surfacing from backend + inferred shopper intent fields)
         - Outputs strict {suggested_changes, explanations}
         """
         return Agent(
-            config=self.agents_config["product_facts_enrichment_agent"],  # type: ignore[index]
+            config=self.agents_config["product_page_enrichment_agent"],  # type: ignore[index]
             verbose=True,
         )
 
     @agent
-    def shopper_intent_enrichment_agent(self) -> Agent:
+    def product_catalog_enrichment_agent(self) -> Agent:
         """
         Agent #3:
-        - Uses comparison output
-        - Suggests intent fields (use_context, target_personas)
+        - Uses comparison output + raw_sources.*
+        - Proposes backend catalog enrichments (e.g., catalog.seo.* and optional catalog.pdp.title)
         - Outputs strict {suggested_changes, explanations}
         """
         return Agent(
-            config=self.agents_config["shopper_intent_enrichment_agent"],  # type: ignore[index]
-            verbose=True,
-        )
-
-    @agent
-    def seo_visible_content_optimization_agent(self) -> Agent:
-        """
-        Agent #4:
-        - Uses comparison output + scraped seo fields
-        - Optimizes title tag, meta description, H1 (and optionally PDP title)
-        - Outputs strict {suggested_changes, explanations}
-        """
-        return Agent(
-            config=self.agents_config["seo_visible_content_optimization_agent"],  # type: ignore[index]
+            config=self.agents_config["product_catalog_enrichment_agent"],  # type: ignore[index]
             verbose=True,
         )
 
     @agent
     def change_synthesizer_agent(self) -> Agent:
         """
-        Agent #5:
-        - Merges outputs of Agents 2/3/4
+        Agent #4:
+        - Merges outputs of product_page_enrichment + product_catalog_enrichment
         - Resolves conflicts deterministically
         - Produces one final change plan + validation
         """
@@ -105,61 +93,47 @@ class LlmoForCatalog:
         )
 
     @task
-    def product_facts_enrichment_task(self) -> Task:
+    def product_page_enrichment_task(self) -> Task:
         """
         Task 2 (Agent #2):
-        - Consume comparison output
-        - Propose factual enrichments
+        - Consume comparison output (including raw_sources.webpage/backend)
+        - Propose PDP webpage-only enrichment (facts surfacing + shopper intent)
         - Output strict JSON {suggested_changes, explanations}
         """
         return Task(
-            config=self.tasks_config["product_facts_enrichment_task"],  # type: ignore[index]
-            context=[self.compare_catalog_vs_webpage_task],
+            config=self.tasks_config["product_page_enrichment_task"],  # type: ignore[index]
+            input_results=[self.compare_catalog_vs_webpage_task],
         )
 
     @task
-    def shopper_intent_enrichment_task(self) -> Task:
+    def product_catalog_enrichment_task(self) -> Task:
         """
         Task 3 (Agent #3):
-        - Consume comparison output
-        - Propose intent enrichment fields
+        - Consume comparison output (including raw_sources.webpage/backend)
+        - Propose backend catalog enrichment (catalog.seo.* and optional catalog.pdp.title)
         - Output strict JSON {suggested_changes, explanations}
         """
         return Task(
-            config=self.tasks_config["shopper_intent_enrichment_task"],  # type: ignore[index]
-            context=[self.compare_catalog_vs_webpage_task],
-        )
-
-    @task
-    def seo_visible_content_optimization_task(self) -> Task:
-        """
-        Task 4 (Agent #4):
-        - Consume comparison output
-        - Propose SEO tag improvements
-        - Output strict JSON {suggested_changes, explanations}
-        """
-        return Task(
-            config=self.tasks_config["seo_visible_content_optimization_task"],  # type: ignore[index]
-            context=[self.compare_catalog_vs_webpage_task],
+            config=self.tasks_config["product_catalog_enrichment_task"],  # type: ignore[index]
+            input_results=[self.compare_catalog_vs_webpage_task],
         )
 
     @task
     def synthesize_final_change_plan_task(self) -> Task:
         """
-        Task 5 (Agent #5):
-        - Merge Agents 2/3/4 results
-        - Resolve conflicts
+        Task 4 (Agent #4):
+        - Merge Agents #2 and #3 results
+        - Resolve conflicts deterministically
         - Output final change plan JSON + validation
         """
         return Task(
             config=self.tasks_config["synthesize_final_change_plan_task"],  # type: ignore[index]
-            context=[
+            input_results=[
                 self.compare_catalog_vs_webpage_task,
-                self.product_facts_enrichment_task,
-                self.shopper_intent_enrichment_task,
-                self.seo_visible_content_optimization_task,
+                self.product_page_enrichment_task,
+                self.product_catalog_enrichment_task,
             ],
-            output_file="catalog_change_plan.json",
+            output_file="suggestions_and_explanations.json",
         )
 
     # -------------------------
