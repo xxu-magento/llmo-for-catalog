@@ -53,6 +53,9 @@ Given a **product detail page URL**, the crew performs the following steps:
 
 ### Agents (4-Agent Pipeline)
 
+![LLMO for Catalog: 4-Agent Pipeline](llmo_agent_flow.png)
+
+
 | Agent | Responsibility |
 |------|----------------|
 | **catalog_comparison_agent** | Scrapes the PDP, fetches Commerce backend data, and produces a structured comparison (including raw sources) |

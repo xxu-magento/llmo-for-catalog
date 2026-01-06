@@ -18,6 +18,7 @@ def run():
     }
 
     try:
+
         result = LlmoForCatalog().crew().kickoff(inputs=inputs)
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
