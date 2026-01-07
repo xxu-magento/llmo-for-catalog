@@ -1,6 +1,6 @@
 # LLMO for Catalog POC
 
-This project is a POC to illustrate the flow for LLMO for catalog. It implements a **multi-agent catalog intelligence pipeline** using [crewAI](https://crewai.com).  
+This project is a POC to illustrate the critical steps (Steps 2 & 3) in the flow for LLMO for catalog (The High Level Design of the entire flow is [here](https://wiki.corp.adobe.com/display/EntComm/High+Level+Design%3A+LLM+Optimizer+for+Catalog)). The POC implements a **multi-agent catalog intelligence pipeline** using [crewAI](https://crewai.com).  
 It is designed to **analyze, compare, and enrich product detail pages (PDPs)** by combining:
 
 - **What is actually rendered on the webpage** (human-visible content and embedded metadata)
@@ -22,6 +22,7 @@ All outputs are **machine-readable JSON**, suitable for **automation, validation
 Given a **product detail page URL**, the crew performs the following steps:
 
 1. **Scrape the webpage** to extract:
+    **Note: the POC writes a scraper tool to scrape the webpage by itself since it does not connect to LLMO Spacecat. But in real production/release, the scraper should be from the LLMO (Spacecat Project scrapers - if its existing scrapers do not scrape all neccessary inforamtion from a PDP, updates/addition are needed.)**
    - Visible content (title, description, images, price)
    - Embedded metadata (JSON-LD, breadcrumbs, SKU)
    - SEO signals (H1, `<title>`, meta description, canonical URL)
@@ -49,7 +50,7 @@ Given a **product detail page URL**, the crew performs the following steps:
 
 ---
 
-## Architecture Overview
+## Architecture Overview of the POC
 
 ### Agents (4-Agent Pipeline)
 
