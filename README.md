@@ -59,15 +59,16 @@ Given a **product detail page URL**, the crew performs the following steps:
 
 | Agent | Responsibility |
 |------|----------------|
-| **catalog_comparison_agent** | Scrapes the PDP, fetches Commerce backend data, and produces a structured comparison (including raw sources) |
-| **product_page_enrichment_agent** | Produces ONE consolidated PDP webpage enrichment proposal (facts surfacing + shopper intent fields), webpage-only changes |
-| **product_catalog_enrichment_agent** | Proposes Commerce catalog backend enrichment (catalog-managed SEO/content fields) |
-| **change_synthesizer_agent** | Merges outputs from enrichment agents into a final, conflict-resolved change plan |
+| **catalog_comparison_agent** | Scrapes the PDP, fetches Commerce backend data for the extracted SKU (including attributes, category, variants, and variant-based price ranges), and produces a structured comparison. The output MUST include `raw_sources.webpage` and `raw_sources.backend`, and treat backend as the source of truth in conflicts. |
+| **product_page_enrichment_agent** | Produces ONE consolidated PDP **webpage-only** enrichment proposal for the delta information missing/weak on the PDP but available in the Commerce catalog (e.g., attributes/specs/material/dimensions/certifications, category path, variants summary, variant-based price range surfacing). **Does not** propose shopper intent fields anymore. |
+| **product_catalog_enrichment_agent** | Proposes **Commerce catalog backend** enrichment for SEO/content-managed fields (e.g., catalog-managed title/description/H1 equivalents) and **also** proposes intent fields to store in catalog: `intent.use_context` and `intent.target_personas`. |
+| **change_synthesizer_agent** | Merges outputs from enrichment agents into a final, conflict-resolved change plan, and de-duplicates suggestions that are identical or near-duplicates of existing current values found in `raw_sources.webpage` or `raw_sources.backend`. |
 
 All enrichment agents output **strict JSON** with the following structure:
 
 - `suggested_changes`: key-value pairs describing what should be added or updated  
 - `explanations`: per-field justification, source, evidence, and implementation notes  
+ 
 
 ---
 

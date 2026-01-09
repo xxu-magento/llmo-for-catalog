@@ -1,250 +1,266 @@
 {
   "final_suggested_changes": {
-    "facts.attributes.color": ["Gray"],
-    "facts.attributes.material_composition": "52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz",
-    "facts.attributes.fit": "Unisex sizing",
-    "facts.attributes.size_options": ["X-Small", "Small", "3X"],
+    "facts.attributes.custom_flags": "Sale Icon",
+    "facts.attributes.hts_code": "6105.10.0000",
+    "facts.attributes.new_arrival": "no",
+    "facts.attributes.preorder_item": "no",
+    "facts.attributes.shopper_group_id": "1819,1818,1817,1000000001",
+    "facts.attributes.weight": 1.5,
     "facts.variants.summary": [
-      "Available in Heather Gray color",
-      "Sizes: X-Small, Small, 3X",
-      "Unisex fit",
-      "Price: $10 USD per variant"
+      "Available in Gray color",
+      "Sizes include X-Small and Small",
+      "3 variants in total, one out of stock"
     ],
-    "facts.facets.category_path": ["Apparel", "T-Shirts"],
+    "facts.facets.category_path": [
+      "Apparel",
+      "T-Shirts",
+      "Graphic Tees"
+    ],
     "pdp.feature_bullets": [
-      "Heather gray tee featuring Adobe Illustrator, Member on the front",
-      "Shape Builders Design Fitness Center illustration on the back",
-      "Soft, mid-weight blend of 52% airlume combed and ring-spun cotton and 48% polyester",
-      "Lightweight fabric at 4.2 ounces",
-      "Unisex sizing ensuring a comfortable fit"
+      "Heather gray tee with Adobe Illustrator branding and Shape Builders Design Fitness Center illustration on the back",
+      "Soft, mid-weight fabric: 52% airlume combed and ring-spun cotton, 48% polyester",
+      "Fabric weight: 4.2 oz",
+      "Unisex sizing available",
+      "Sale price: $10, regular price: $24"
     ],
-    "pdp.description_plain": "Calling all shape builders. Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Made from a soft, mid-weight blend of 52% airlume combed and ring-spun cotton and 48% polyester, weighing 4.2oz. Features unisex sizing.",
+    "pdp.description_plain": "Calling all shape builders. Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing.",
     "intent.use_context": [
       "Casual wear",
-      "Graphic tee collectors",
-      "Adobe Illustrator fans",
-      "Everyday comfortable apparel"
+      "Graphic and tech-themed events",
+      "Everyday comfort wear"
     ],
     "intent.target_personas": [
+      "Adobe Illustrator users and enthusiasts",
       "Graphic designers",
-      "Adobe product fans",
-      "Teens and young adults",
-      "Unisex casual wear shoppers"
+      "Fans of creative and tech-branded apparel",
+      "Unisex adult consumers"
     ],
-    "catalog.seo.title_tag": "Adobe Illustrator Heather Gray Tee – Soft Unisex Graphic T-Shirt",
-    "catalog.seo.meta_description": "Discover the Heather Gray Illustrator tee featuring Adobe and Shape Builders designs. Made from a soft 52% cotton, 48% polyester blend with unisex sizing. Shop now!",
-    "catalog.seo.h1": "Illustrator Tee – Heather Gray Unisex Graphic Shirt",
+    "catalog.seo.title_tag": "Illustrator Tee - Heather Gray Unisex Graphic T-Shirt",
+    "catalog.seo.meta_description": "Soft mid-weight Heather Gray tee with Adobe Illustrator branding and Shape Builders Design illustration on the back. Unisex sizes XS to Small at $10 sale price.",
+    "catalog.seo.h1": "Illustrator Tee Heather Gray - Unisex Graphic Shirt",
     "catalog.pdp.title": "Illustrator Tee Heather Gray"
   },
   "final_explanations": {
-    "facts.attributes.color": {
-      "why": "Backend data confirms the product color is 'Gray', missing from the webpage's structured attributes.",
+    "facts.attributes.custom_flags": {
+      "why": "Backend contains specific product attribute 'custom_flags' which is not present on the webpage. Surfacing it may enhance marketing and filtering.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
         "webpage_value": null,
-        "backend_value": ["Gray"]
+        "backend_value": "Sale Icon"
       },
-      "implementation_notes": "Add structured color attribute to the webpage facts.attributes.color for improved filtering and clarity."
+      "implementation_notes": "Add this attribute under facts.attributes.custom_flags on the webpage."
     },
-    "facts.attributes.material_composition": {
-      "why": "Material composition is detailed in backend description but missing on webpage, important for shopper information.",
+    "facts.attributes.hts_code": {
+      "why": "HTS code is important for compliance and customs purposes and is available in backend but missing on the webpage.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
         "webpage_value": null,
-        "backend_value": "52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz"
+        "backend_value": "6105.10.0000"
       },
-      "implementation_notes": "Add material_composition attribute to improve shopper understanding of fabric and quality."
+      "implementation_notes": "Surface the HTS code under facts.attributes.hts_code."
     },
-    "facts.attributes.fit": {
-      "why": "Backend specifies unisex sizing which helps shoppers understand fit, not on webpage.",
+    "facts.attributes.new_arrival": {
+      "why": "Indicates product arrival status; backend states 'no' which can inform shopper expectations.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
         "webpage_value": null,
-        "backend_value": "Unisex sizing"
+        "backend_value": "no"
       },
-      "implementation_notes": "Add fit attribute for enhanced product description and filtering."
+      "implementation_notes": "Include this attribute under facts.attributes.new_arrival."
     },
-    "facts.attributes.size_options": {
-      "why": "Size options are inconsistent between webpage and backend, reconcile by including all unique sizes present.",
+    "facts.attributes.preorder_item": {
+      "why": "Preorder status is 'no' in the backend, clarifying availability.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
-        "webpage_value": ["3X", "SM", "XS"],
-        "backend_value": ["X-Small", "Small"]
+        "webpage_value": null,
+        "backend_value": "no"
       },
-      "implementation_notes": "Update size options to clearly present all variant sizes from backend, using full size names with 3X included as currently on webpage."
+      "implementation_notes": "Surface on webpage under facts.attributes.preorder_item."
+    },
+    "facts.attributes.shopper_group_id": {
+      "why": "Shopper group IDs can be useful for personalization or filtering, found in backend but missing on webpage.",
+      "sources": ["product_facts_enrichment_task"],
+      "evidence": {
+        "webpage_value": null,
+        "backend_value": "1819,1818,1817,1000000001"
+      },
+      "implementation_notes": "Include under facts.attributes.shopper_group_id."
+    },
+    "facts.attributes.weight": {
+      "why": "Product weight (1.5) is in backend but missing on webpage; important for shipping and logistics info.",
+      "sources": ["product_facts_enrichment_task"],
+      "evidence": {
+        "webpage_value": null,
+        "backend_value": 1.5
+      },
+      "implementation_notes": "Add under facts.attributes.weight on webpage."
     },
     "facts.variants.summary": {
-      "why": "Summarizing variant characteristics improves shopper understanding of product variety.",
+      "why": "Backend offers explicit color and size variant info with stock status, webpage only shows variant skus; summarizing variants improves shopper clarity.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
         "webpage_value": null,
-        "backend_value": [
-          {
-            "sku": "ADB366.GRY-3X",
-            "size": "3X",
-            "color": "Gray",
-            "price": 10
+        "backend_value": {
+          "color": {
+            "values": [
+              {
+                "title": "Gray",
+                "inStock": true
+              }
+            ]
           },
-          {
-            "sku": "ADB366.GRY-SM",
-            "size": "Small",
-            "color": "Gray",
-            "price": 10
+          "size": {
+            "values": [
+              {
+                "title": "X-Small",
+                "inStock": true
+              },
+              {
+                "title": "Small",
+                "inStock": true
+              }
+            ]
           },
-          {
-            "sku": "ADB366.GRY-XS",
-            "size": "X-Small",
-            "color": "Gray",
-            "price": 10
-          }
-        ]
+          "variants": [
+            {
+              "sku": "ADB366.GRY-3X",
+              "inStock": false
+            },
+            {
+              "sku": "ADB366.GRY-SM",
+              "inStock": true
+            },
+            {
+              "sku": "ADB366.GRY-XS",
+              "inStock": true
+            }
+          ]
+        }
       },
-      "implementation_notes": "Create a concise summary array describing variant color, sizes and price for quick shopper insight."
+      "implementation_notes": "Add a concise summary list of variants characteristics, including stock info."
     },
     "facts.facets.category_path": {
-      "why": "Category and facets guide shopper navigation and filtering; assigning product under Apparel > T-Shirts is consistent with backend product nature.",
+      "why": "No explicit category path is on the webpage though the product fits apparel/t-shirt categories. Adding relevant category paths improves faceting/filtering.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
         "webpage_value": null,
         "backend_value": null
       },
-      "implementation_notes": "Assign category path to enhance product discovery in relevant categories."
+      "implementation_notes": "Assign category path based on product type and typical categorization: Apparel > T-Shirts > Graphic Tees."
     },
     "pdp.feature_bullets": {
-      "why": "Detailed feature bullets from backend provide clear, factual highlights attractive to shoppers.",
+      "why": "The backend rich description contains detailed, factual info about fabric, branding, and pricing that is missing from webpage; bullets improve scannability.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
         "webpage_value": null,
         "backend_value": "<div><p><b>Calling all shape builders.</b><br />Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back.</p>\r\n<p>Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing.</p></div>"
       },
-      "implementation_notes": "Extract key facts into bulleted format for improved shopper experience and scanning."
+      "implementation_notes": "Extract key product facts as bullet points for easy reading."
     },
     "pdp.description_plain": {
-      "why": "Webpage currently has only minimal description, enriching with backend detail enhances shopper understanding and SEO.",
+      "why": "Webpage description is minimal, backend has detailed and rich description valuable for customers and SEO.",
       "sources": ["product_facts_enrichment_task"],
       "evidence": {
         "webpage_value": "Illustrator tee",
         "backend_value": "<div><p><b>Calling all shape builders.</b><br />Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back.</p>\r\n<p>Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing.</p></div>"
       },
-      "implementation_notes": "Add a clear, plain-text product description that summarizes the key product details."
+      "implementation_notes": "Use the backend description cleaned to plain text and include on the webpage."
     },
     "intent.use_context": {
-      "why": "The product's design and description suggest casual wear occasions, appealing to Adobe Illustrator fans and graphic tee collectors.",
+      "why": "Product is a graphic tee with Adobe Illustrator branding and unisex sizing suggesting uses in casual wear, creative work, and related social events.",
       "sources": ["shopper_intent_enrichment_task"],
       "evidence": {
         "webpage_value": null,
-        "backend_value": "Heather gray tee with Adobe Illustrator design and shape builders illustration"
+        "backend_value": "<b>Calling all shape builders.</b> Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Unisex sizing."
       },
-      "implementation_notes": "Add relevant contextual use cases to improve targeting and shopper intent matching."
+      "implementation_notes": "Add general contextual use scenarios where shoppers might wear this tee."
     },
     "intent.target_personas": {
-      "why": "The product appeals to graphic designers, Adobe fans, and general casual unisex apparel shoppers.",
+      "why": "The product’s Adobe Illustrator branding and design focus target creative professionals, graphic designers and fans of Adobe software apparel. Unisex sizing broadens target.",
       "sources": ["shopper_intent_enrichment_task"],
       "evidence": {
         "webpage_value": null,
-        "backend_value": "Design details referencing Adobe Illustrator and shape builders, unisex sizing"
+        "backend_value": "Adobe Illustrator tee, unisex sizing for adults"
       },
-      "implementation_notes": "Define plausible target personas for improved retrieval and marketing efforts."
+      "implementation_notes": "Define likely personas for better targeting and retrieval."
     },
     "catalog.seo.title_tag": {
-      "why": "The current title is too generic and minimal, lacking descriptive keywords that help with SEO and shopper clarity. Including 'Adobe', color, fabric blend, and unisex fit terms from backend data improves search relevance while maintaining natural language.",
+      "why": "Expands on the overly minimal current title by including color, style, and unisex sizing to improve SEO and shopper clarity without keyword stuffing.",
       "sources": ["seo_visible_content_optimization_task"],
       "evidence": {
         "webpage_value": "Illustrator tee",
-        "backend_value": "Heather gray tee with Adobe Illustrator, Member on the front. Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing."
+        "backend_value": "Illustrator tee"
       },
-      "implementation_notes": "Update the catalog.seo.title_tag to include brand-related and product descriptive keywords that reflect backend facts for improved discoverability."
+      "implementation_notes": "Enhance the title_tag by appending key attributes like color (Heather Gray) and unisex sizing for clearer search relevance."
     },
     "catalog.seo.meta_description": {
-      "why": "The current meta description is minimal and duplicates the product name, providing little information for search engines or shoppers. A richer, keyword-inclusive description from backend details offers helpful context and entices clicks.",
+      "why": "Replaces the minimal meta description with a concise summary of product key features (fabric, color, branding, sizes, and sale price) to improve clickthrough and SEO.",
       "sources": ["seo_visible_content_optimization_task"],
       "evidence": {
         "webpage_value": "Illustrator tee",
-        "backend_value": "Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing."
+        "backend_value": "<div><p><b>Calling all shape builders.</b><br />Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back.</p>\r\n<p>Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing.</p></div> Price: $10 on sale from $24"
       },
-      "implementation_notes": "Rewrite the catalog.seo.meta_description to summarize product highlights and material info while including relevant keywords without stuffing."
+      "implementation_notes": "Use backend rich description and pricing info to craft an informative, natural meta description within length limits."
     },
     "catalog.seo.h1": {
-      "why": "The webpage uses the simple product name as H1, which is too generic. Adding color and 'unisex graphic shirt' from backend data enhances clarity for shoppers and SEO by providing more informative heading text.",
+      "why": "Adds more detail to the page's main heading than the current minimal text, reflecting the product’s key visual and sizing attributes for better user experience and SEO distinctiveness.",
       "sources": ["seo_visible_content_optimization_task"],
       "evidence": {
         "webpage_value": "Illustrator tee",
-        "backend_value": "Heather gray tee with Adobe Illustrator, Member on the front. Soft, mid-weight blend of cotton and polyester. Unisex sizing."
+        "backend_value": "Heather gray tee with Adobe Illustrator branding and Shape Builders Design Fitness Center illustration on the back; Unisex sizing"
       },
-      "implementation_notes": "Update the catalog.seo.h1 to a natural phrase that includes key product attributes found in the backend."
+      "implementation_notes": "Update h1 to a richer descriptive text that complements the title_tag and meta_description without redundancy."
     },
     "catalog.pdp.title": {
-      "why": "Aligning the product page title slightly closer to descriptive style with color included improves shopper clarity without deviating from backend product name.",
+      "why": "Aligns the displayed product title to reflect the key color attribute 'Heather Gray' explicitly, improving shopper clarity and SEO alignment with backend facts.",
       "sources": ["seo_visible_content_optimization_task"],
       "evidence": {
         "webpage_value": "Illustrator tee",
-        "backend_value": "Illustrator tee (Heather gray, unisex)"
+        "backend_value": "Heather gray tee"
       },
-      "implementation_notes": "Modify catalog.pdp.title to add 'Heather Gray' to the product name to match variant and description details."
+      "implementation_notes": "Include 'Heather Gray' in the pdp.title field so frontend can show a clearer product name."
     }
   },
   "conflicts_resolved": [
     {
+      "field": "pdp.title",
+      "candidates": [
+        {
+          "from": "product_facts_enrichment_task",
+          "value": "Illustrator tee"
+        },
+        {
+          "from": "seo_visible_content_optimization_task",
+          "value": "Illustrator Tee Heather Gray"
+        }
+      ],
+      "chosen": {
+        "from": "seo_visible_content_optimization_task",
+        "value": "Illustrator Tee Heather Gray"
+      },
+      "rationale": "The seo_visible_content_optimization_task version includes the color attribute 'Heather Gray' which aligns with backend product attributes and complements SEO title and meta tags for coherence and clarity. It is factually correct and more informative."
+    },
+    {
       "field": "pdp.description_plain",
       "candidates": [
-        {"from": "product_facts_enrichment_task", "value": "Calling all shape builders. Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Made from a soft, mid-weight blend of 52% airlume combed and ring-spun cotton and 48% polyester, weighing 4.2oz. Features unisex sizing."},
-        {"from": "seo_visible_content_optimization_task", "value": null},
-        {"from": "shopper_intent_enrichment_task", "value": null}
+        {
+          "from": "product_facts_enrichment_task",
+          "value": "Calling all shape builders. Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing."
+        },
+        {
+          "from": "shopper_intent_enrichment_task",
+          "value": "Illustrator tee"
+        }
       ],
-      "chosen": {"from": "product_facts_enrichment_task", "value": "Calling all shape builders. Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Made from a soft, mid-weight blend of 52% airlume combed and ring-spun cotton and 48% polyester, weighing 4.2oz. Features unisex sizing."},
-      "rationale": "Only product_facts_enrichment_task suggested a factual, detailed description consistent with backend facts and coherent with SEO tags; others did not provide alternatives."
-    },
-    {
-      "field": "facts.attributes.size_options",
-      "candidates": [
-        {"from": "product_facts_enrichment_task", "value": ["X-Small", "Small", "3X"]}
-      ],
-      "chosen": {"from": "product_facts_enrichment_task", "value": ["X-Small", "Small", "3X"]},
-      "rationale": "Size options were inconsistent on webpage; product_facts_enrichment_task reconciled by including all sizes with full naming where possible, ensuring factual correctness."
-    },
-    {
-      "field": "catalog.seo.title_tag",
-      "candidates": [
-        {"from": "seo_visible_content_optimization_task", "value": "Adobe Illustrator Heather Gray Tee – Soft Unisex Graphic T-Shirt"},
-        {"from": "product_facts_enrichment_task", "value": null},
-        {"from": "shopper_intent_enrichment_task", "value": null}
-      ],
-      "chosen": {"from": "seo_visible_content_optimization_task", "value": "Adobe Illustrator Heather Gray Tee – Soft Unisex Graphic T-Shirt"},
-      "rationale": "Per rules, fields starting with 'seo.' are preferred from seo_visible_content_optimization_task for optimized content."
-    },
-    {
-      "field": "catalog.seo.meta_description",
-      "candidates": [
-        {"from": "seo_visible_content_optimization_task", "value": "Discover the Heather Gray Illustrator tee featuring Adobe and Shape Builders designs. Made from a soft 52% cotton, 48% polyester blend with unisex sizing. Shop now!"},
-        {"from": "product_facts_enrichment_task", "value": null},
-        {"from": "shopper_intent_enrichment_task", "value": null}
-      ],
-      "chosen": {"from": "seo_visible_content_optimization_task", "value": "Discover the Heather Gray Illustrator tee featuring Adobe and Shape Builders designs. Made from a soft 52% cotton, 48% polyester blend with unisex sizing. Shop now!"},
-      "rationale": "SEO related meta description is best sourced from seo_visible_content_optimization_task for best optimization and keyword inclusion."
-    },
-    {
-      "field": "catalog.seo.h1",
-      "candidates": [
-        {"from": "seo_visible_content_optimization_task", "value": "Illustrator Tee – Heather Gray Unisex Graphic Shirt"},
-        {"from": "product_facts_enrichment_task", "value": null},
-        {"from": "shopper_intent_enrichment_task", "value": null}
-      ],
-      "chosen": {"from": "seo_visible_content_optimization_task", "value": "Illustrator Tee – Heather Gray Unisex Graphic Shirt"},
-      "rationale": "SEO heading h1 field uses value from seo_visible_content_optimization_task per priority rules."
-    },
-    {
-      "field": "catalog.pdp.title",
-      "candidates": [
-        {"from": "seo_visible_content_optimization_task", "value": "Illustrator Tee Heather Gray"},
-        {"from": "product_facts_enrichment_task", "value": null},
-        {"from": "shopper_intent_enrichment_task", "value": null}
-      ],
-      "chosen": {"from": "seo_visible_content_optimization_task", "value": "Illustrator Tee Heather Gray"},
-      "rationale": "pdp.title is present in multiple sources but only seo_visible_content_optimization_task suggested a value, which aligns well with facts and SEO coherence."
+      "chosen": {
+        "from": "product_facts_enrichment_task",
+        "value": "Calling all shape builders. Heather gray tee with Adobe Illustrator, Member on the front. Shape Builders Design Fitness Center illustration on the back. Soft, mid-weight tee is 52% airlume combed and ring-spun cotton, 48% polyester, 4.2oz. Unisex sizing."
+      },
+      "rationale": "Per the merging rules, 'pdp.' keys get selected based on factual consistency and coherence with SEO tags and backend data. The product_facts_enrichment_task description is detailed, factually consistent with backend rich description, and improves user experience and SEO compared to the minimal shopper_intent_enrichment_task suggestion."
     }
   ],
   "validation": {
     "schema_ok": true,
-    "notes": "All required keys are present with correct types. Fields adhere to precedence rules and no contradictions with backend data exist."
+    "notes": "Output matches expected keys and types exactly, merging follows priority rules with consistent factual alignment to backend and coherence with SEO tags."
   }
 }
